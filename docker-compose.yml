@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  twenty-server:
+    image: twentycrm/twenty:${TWENTY_VERSION:-latest}
+    container_name: twenty-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${TWENTY_PORT:-3000}:3000"
+    environment:
+      NODE_PORT: 3000
+      PG_DATABASE_URL: postgresql://${POSTGRES_USER:-twenty}:${POSTGRES_PASSWORD:-twenty}@postgres:5432/${POSTGRES_DB:-twenty}
+      REDIS_URL: redis://redis:6379
+      APP_SECRET: ${APP_SECRET:-replace-me-32chars-min}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-replace-me-32chars-min}
+      LOGIN_TOKEN_SECRET: ${LOGIN_TOKEN_SECRET:-replace-me-32chars-min}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-replace-me-32chars-min}
+      FILE_TOKEN_SECRET: ${FILE_TOKEN_SECRET:-replace-me-32chars-min}
+      STORAGE_TYPE: local
+      STORAGE_LOCAL_PATH: /app/packages/twenty-server/.local-storage
+      DISABLE_DB_MIGRATIONS: "false"
+      SERVER_URL: ${SERVER_URL:-http://localhost:3000}
+      FRONT_BASE_URL: ${FRONT_BASE_URL:-http://localhost:3000}
+    volumes:
+      - twenty-local-storage:/app/packages/twenty-server/.local-storage
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: twenty-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-twenty}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twenty}
+      POSTGRES_DB: ${POSTGRES_DB:-twenty}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-twenty} -d ${POSTGRES_DB:-twenty}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - twenty-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: twenty-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - twenty-redis-data:/data
+
+volumes:
+  twenty-postgres-data:
+  twenty-redis-data:
+  twenty-local-storage:
